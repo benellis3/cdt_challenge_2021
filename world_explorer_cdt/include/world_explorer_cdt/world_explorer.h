@@ -72,7 +72,7 @@ class WorldExplorer
     double planning_time_ = 0.5;
     double path_execute_limit_ = 100.0;
 
-    double max_local_planner_distance = 20.0; //TODO adjust
+    double max_local_planner_distance = 10.0; //TODO adjust
 
 
     bool start_exploring_ = false;

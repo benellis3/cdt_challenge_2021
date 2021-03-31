@@ -1,4 +1,6 @@
 #include <world_explorer_cdt/local_planner.h>
+#include <math.h>
+#include <cmath>
 
 LocalPlanner::LocalPlanner()
 {
@@ -68,13 +70,22 @@ std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers f
         frontier_costs.push_back(f);
     }
 
-    // TODO Compute cost combining information generated above, free to come up with other cost function terms
+    // Compute cost combining information generated above, free to come up with other cost function terms
+
     for(auto& frontier : frontier_costs){
-        // We need to create a cost, lower cost is better                                 
+        // create a cost, lower cost is better                                 
  
-        // start out just using the closest frontier (no need to take the square root because the quadratic function is monotonically increasing)
+        // start out just using the closest frontier
         frontier.cost_ = std::hypot(robot_x - frontier.x_, robot_y - frontier.y_);
+        //std::cout << "Distance cost " << frontier.cost_ << std::endl;
+        // penalise frontiers close to previously visited poses
         frontier.cost_ += FRONTIER_REPULSION_COEFF / (frontier.closest_visited_point_dist_ + 1e-3);
+        //std::cout << "Distance and Avoidance cost " << frontier.cost_ << std::endl;
+        // penalise frontiers that require a lot of turning
+        frontier.cost_ += FRONTIER_ORIENTATION_PENALTY * abs(atan2(frontier.y_ - robot_y, frontier.x_ - robot_x) - robot_theta);
+        //std::cout << "robot theta: " << robot_theta << " angle to frontier: " << atan2(frontier.y_ - robot_y, frontier.x_ - robot_x) << " Orientation cost term: " <<  abs(atan2(frontier.y_ - robot_y, frontier.x_ - robot_x) - robot_theta) << std::endl;
+        //std::cout <<"total cost " << frontier.cost_ << std::endl;
+
     }
 
     // We want to sort the frontiers using the costs previously computed

@@ -53,7 +53,8 @@ private:
     // Stuff for selecting frontiers
     std::vector<geometry_msgs::Pose> visited_poses_;
     int num_visited_poses_;
-    double FRONTIER_REPULSION_COEFF = 10.0;
+    double FRONTIER_REPULSION_COEFF = 20.0;
+    double FRONTIER_ORIENTATION_PENALTY = 1.5;
 
     // Utils
     bool processPlannerOutput(const ompl::base::PlannerStatus& solved, 
