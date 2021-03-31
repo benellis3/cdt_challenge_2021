@@ -217,7 +217,7 @@ void WorldModelling::findCurrentFrontiers(const float &x, const float &y, const 
         frontier.header.frame_id = input_fixed_frame_; // And the frame it's referenced to
         frontier.point.x = frontier_x;
         frontier.point.y = frontier_y;
-        Eigen::Vector2d position(frontier_x, frontier_y);
+        grid_map::Position position(frontier_x, frontier_y);
         bool is_inside = traversability_.isInside(position);
         bool is_traversable = traversability_.atPosition("traversability", position) == 1.0;
         ROS_DEBUG_STREAM("IsInside: " << is_inside);
