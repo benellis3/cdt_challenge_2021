@@ -29,6 +29,7 @@ class LocalPlanner
     struct FrontierCost{
         double x_;
         double y_;
+        double closest_visited_point_dist_;
         double cost_;
     };
 
@@ -49,6 +50,11 @@ private:
     std::shared_ptr<ompl::geometric::RRTstar> rrt_star_planner_;
     std::shared_ptr<ompl::base::ProblemDefinition> problem_definition_;
 
+    // Stuff for selecting frontiers
+    std::vector<geometry_msgs::Pose> visited_poses_;
+    int num_visited_poses_;
+    double FRONTIER_REPULSION_COEFF = 10.0;
+
     // Utils
     bool processPlannerOutput(const ompl::base::PlannerStatus& solved, 
                                 std::vector<Eigen::Vector2d>& route);
@@ -62,6 +68,7 @@ public:
     // Interfaces to set data
     void setMap(const grid_map::GridMap& map);
     void setPlanningTime(double planning_time){ planning_time_ = planning_time; };
+    void setVisitedPositions(const std::vector<geometry_msgs::Pose>& nodes);
 
     // Main methods
     std::vector<Eigen::Vector2d> searchFrontiers(cdt_msgs::Frontiers frontiers, 

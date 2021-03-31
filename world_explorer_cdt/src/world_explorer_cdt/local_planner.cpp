@@ -29,6 +29,11 @@ void LocalPlanner::setMap(const grid_map::GridMap& map)
         ROS_ERROR("trav layer does not exist in map");   
 }
 
+void LocalPlanner::setVisitedPositions(const std::vector<geometry_msgs::Pose>& nodes){
+    visited_poses_ = nodes;
+    num_visited_poses_ = nodes.size();
+}
+
 std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers frontiers, 
                                                           const double& robot_x, const double&  robot_y, const double&  robot_theta)
 {
@@ -48,6 +53,17 @@ std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers f
         f.x_ = frontier.point.x;
         f.y_ = frontier.point.y;
 
+        // calculate distance to closest point already visited
+        f.closest_visited_point_dist_ = 1e5;
+        double current_dist;
+        for(auto& pose : visited_poses_)
+        {
+            current_dist = std::hypot(f.x_ - pose.position.x, f.y_ - pose.position.y);
+            if(current_dist < f.closest_visited_point_dist_){
+                f.closest_visited_point_dist_ = current_dist;
+            }
+        }
+
         // Store in frontier_headings
         frontier_costs.push_back(f);
     }
@@ -58,6 +74,7 @@ std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers f
  
         // start out just using the closest frontier (no need to take the square root because the quadratic function is monotonically increasing)
         frontier.cost_ = std::hypot(robot_x - frontier.x_, robot_y - frontier.y_);
+        frontier.cost_ += FRONTIER_REPULSION_COEFF / (frontier.closest_visited_point_dist_ + 1e-3);
     }
 
     // We want to sort the frontiers using the costs previously computed

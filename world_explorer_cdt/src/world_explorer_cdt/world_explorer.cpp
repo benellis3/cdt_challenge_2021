@@ -120,6 +120,13 @@ void WorldExplorer::graphCallback(const cdt_msgs::Graph& in_graph)
     // Set the graph structure to graph planner
     graph_planner_.setGraph(in_graph);
 
+    // save visited poses in local planner
+    std::vector<geometry_msgs::Pose> visited_nodes;
+    for(auto node : in_graph.nodes){
+        visited_nodes.push_back(node.pose);
+    }
+    local_planner_.setVisitedPositions(visited_nodes);
+
     // save starting pose
     starting_pose_ = in_graph.nodes.at(0).pose;
 
