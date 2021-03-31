@@ -53,6 +53,8 @@ void WorldModelling::readParameters(ros::NodeHandle &nh)
     nh.param("distance_to_delete_frontier", distance_to_delete_frontier_, 2.5f);
     nh.param("max_distance_to_delete_frontier", max_distance_to_delete_frontier_, 2.5f);
     nh.param("frontiers_search_angle_resolution", frontiers_search_angle_resolution_, 0.5f);
+
+    slope_threshold_ = 0.1;
 }
 
 void WorldModelling::elevationMapCallback(const grid_map_msgs::GridMap &in_grid_map)
@@ -159,7 +161,10 @@ void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
     // Create a new traversability layer with initial value 0.0
     traversability_.add("traversability", 0.0);
 
+    grid_map::Size grid_map_size = grid_map.getSize();
+
     // Iterate the traversability map to apply a threshold on the height
+    float elevation, x_slope, y_slope, max_slope;
     uint32_t traversable_points = 0;
     uint32_t total_points = 0;
     for (grid_map::GridMapIterator iterator(traversability_); !iterator.isPastEnd(); ++iterator)
@@ -169,11 +174,22 @@ void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
         {
             // Since the location has no significant slopes, only walls, we can just use a simple
             // height threshold
-            if (traversability_.at("elevation", *iterator) > elevation_threshold_) {
-                traversability_.at("traversability", *iterator) = -1.0;
+            grid_map::Index location = *iterator;
+            grid_map::Index previous_x(std::max(location[0]-1, 0), location[1]);
+            grid_map::Index next_x(std::min(location[0]+1, grid_map_size[0]-1), location[1]);
+            grid_map::Index previous_y(location[0], std::max(location[1]-1, 0));
+            grid_map::Index next_y(location[1], std::min(location[1]+1, grid_map_size[1]-1));
+
+            elevation = traversability_.at("elevation", location);
+            x_slope = traversability_.at("elevation", previous_x) - traversability_.at("elevation", next_x);
+            y_slope = traversability_.at("elevation", previous_y) - traversability_.at("elevation", next_y);
+            max_slope = std::max(std::abs(x_slope), std::abs(y_slope));
+
+            if (elevation > elevation_threshold_ || max_slope > slope_threshold_) {
+                traversability_.at("traversability", location) = -1.0;
             }
             else {
-                traversability_.at("traversability", *iterator) = 1.0;
+                traversability_.at("traversability", location) = 1.0;
                 traversable_points++;
             }
             total_points++;

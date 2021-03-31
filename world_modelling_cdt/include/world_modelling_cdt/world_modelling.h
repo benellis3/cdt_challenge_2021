@@ -67,6 +67,8 @@ class WorldModelling
     bool first_node_;
     bool first_frontier_;
 
+    float slope_threshold_;
+
 public:
     // Constructor
     WorldModelling(ros::NodeHandle &nh);
