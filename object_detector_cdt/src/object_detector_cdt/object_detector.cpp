@@ -72,10 +72,8 @@ void ObjectDetector::imageCallback(const sensor_msgs::ImageConstPtr &in_msg)
     convertMessageToImage(in_msg, image, timestamp);
 
     // Recognize object
-    // Dog
-    // TODO: This only publishes the first time we detect the dog
-    // if(!wasObjectDetected("dog")) // TODO: implement a better check
-    // {
+    if(!wasObjectDetected("dog"))
+    {
         cdt_msgs::Object new_object;
         bool valid_object = recognizeDog(image, timestamp, x, y, theta, new_object);
 
@@ -84,9 +82,43 @@ void ObjectDetector::imageCallback(const sensor_msgs::ImageConstPtr &in_msg)
         {
             detected_objects_.objects.push_back(new_object);
         }
-    // }
-    // TODO: Add other objects here
+    }
 
+    if(!wasObjectDetected("barrow"))
+    {
+        cdt_msgs::Object new_object;
+        bool valid_object = recognizeBarrow(image, timestamp, x, y, theta, new_object);
+
+        // If recognized, add to list of detected objects
+        if (valid_object)
+        {
+            detected_objects_.objects.push_back(new_object);
+        }
+    }
+
+    if(!wasObjectDetected("barrel"))
+    {
+        cdt_msgs::Object new_object;
+        bool valid_object = recognizeBarrel(image, timestamp, x, y, theta, new_object);
+
+        // If recognized, add to list of detected objects
+        if (valid_object)
+        {
+            detected_objects_.objects.push_back(new_object);
+        }
+    }
+
+    if(!wasObjectDetected("computer"))
+    {
+        cdt_msgs::Object new_object;
+        bool valid_object = recognizeComputer(image, timestamp, x, y, theta, new_object);
+
+        // If recognized, add to list of detected objects
+        if (valid_object)
+        {
+            detected_objects_.objects.push_back(new_object);
+        }
+    }
 
     // Publish list of objects detected so far
     objects_pub_.publish(detected_objects_);
@@ -114,11 +146,11 @@ cv::Mat ObjectDetector::applyColourFilter(const cv::Mat &in_image_bgr, const Col
     if (colour == Colour::RED) {
         inRange(in_image_hsv, cv::Scalar(  0,  5,  0), cv::Scalar( 1, 255, 255), mask);
     } else if (colour == Colour::YELLOW) {
-        inRange(in_image_hsv, cv::Scalar(  0,  0,  0), cv::Scalar( 255, 255, 255), mask);
+        inRange(in_image_hsv, cv::Scalar(  30,  75,  25), cv::Scalar( 35, 255, 255), mask);
     } else if (colour == Colour::GREEN) {
-        inRange(in_image_hsv, cv::Scalar(  0,  0,  0), cv::Scalar( 255, 255, 255), mask);
+        inRange(in_image_hsv, cv::Scalar(  35,  100,  25), cv::Scalar( 85, 255, 255), mask);
     } else if (colour == Colour::BLUE) {
-        inRange(in_image_hsv, cv::Scalar(  0,  0,  0), cv::Scalar( 255, 255, 255), mask);
+        inRange(in_image_hsv, cv::Scalar(  110,  25,  25), cv::Scalar( 130, 255, 255), mask);
     } else {
         // Report color not implemented
         ROS_ERROR_STREAM("[ObjectDetector::colourFilter] colour (" << colour << "  not implemented!");
@@ -128,6 +160,9 @@ cv::Mat ObjectDetector::applyColourFilter(const cv::Mat &in_image_bgr, const Col
     cv::erode(mask, eroded_mask, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
     cv::dilate(eroded_mask, dilated_mask, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
 
+    cv::imwrite("/home/cdt2021/input_img_hsv.png", in_image_hsv);
+    cv::imwrite("/home/cdt2021/mask.png", dilated_mask);
+
     // We return the mask, that will be used later
     return dilated_mask;
 }
@@ -136,7 +171,6 @@ cv::Mat ObjectDetector::applyBoundingBox(const cv::Mat1b &in_mask, double &x, do
 
     cv::Mat drawing; // it could be useful to fill this image if you want to debug
 
-    // TODO: Compute the bounding box using the mask
     // You need to return the center of the object in image coordinates, as well as a bounding box indicating its height and width (in pixels)
     int top_left_x, top_left_y, bottom_right_x, bottom_right_y;
     top_left_x = in_mask.rows;
@@ -182,37 +216,33 @@ cv::Mat ObjectDetector::applyBoundingBox(const cv::Mat1b &in_mask, double &x, do
     return drawing;
 }
 
-// cv::imwrite(img, path)
-
-bool ObjectDetector::recognizeDog(const cv::Mat &in_image, const ros::Time &in_timestamp, 
-                                  const double& robot_x, const double& robot_y, const double& robot_theta,
-                                  cdt_msgs::Object &out_new_object)
-{
-    // The values below will be filled by the following functions
-    double dog_image_center_x;
-    double dog_image_center_y;
-    double dog_image_height;
-    double dog_image_width;
-
-    // TODO: the functions we use below should be filled to make this work
-    cv::Mat in_image_red = applyColourFilter(in_image, Colour::RED);
-    cv::Mat in_image_bounding_box = applyBoundingBox(in_image_red, dog_image_center_x, dog_image_center_y, dog_image_width, dog_image_height);
-
-    // Note: Almost everything below should be kept as it is
-    if (dog_image_width < MIN_BBOX_WIDTH || dog_image_height < MIN_BBOX_HEIGHT) {
-        return false;
+void ObjectDetector::computePoseFromBBox(double &x, double &y, double &z, double &depth,
+                                         const double &obj_image_center_x, const double &obj_image_center_y,
+                                         const double &obj_image_height, const double &obj_image_width,
+                                         const double& robot_x, const double& robot_y,
+                                         const double& robot_theta, std::string object_name) {
+    double real_object_height;
+    if(object_name == "dog") {
+        real_object_height = dog_real_height_;
+    } else if(object_name == "barrow") {
+        real_object_height = barrow_real_height_;
+    } else if(object_name == "barrel") {
+        real_object_height = barrel_real_height_;
+    } else if(object_name == "computer") {
+        real_object_height = computer_real_height_;
+    } else {
+        ROS_ERROR_STREAM("[ObjectDetector::computePoseFromBBox] object (" << object_name << "  not implemented!");
     }
 
     // We convert the image position in pixels into "real" coordinates in the camera frame
     // We use the intrinsics to compute the depth
-    double depth = dog_real_height_ / dog_image_height * camera_fy_;
+    depth = real_object_height / obj_image_height * camera_fy_;
 
     // We now back-project the center using the  pinhole camera model
     // The result is in camera coordinates. Camera coordinates are weird, see note below
-    double dog_position_camera_x = depth / camera_fx_ * (dog_image_center_x - camera_cx_);
-    double dog_position_camera_y = depth / camera_fy_ * (dog_image_center_y - camera_cy_);
-    double dog_position_camera_z = depth;
-
+    double obj_position_camera_x = depth / camera_fx_ * (obj_image_center_x - camera_cx_);
+    double obj_position_camera_y = depth / camera_fy_ * (obj_image_center_y - camera_cy_);
+    double obj_position_camera_z = depth;
 
     // Camera coordinates are different to robot and fixed frame coordinates
     // Robot and fixed frame are x forward, y left and z upward
@@ -222,27 +252,78 @@ bool ObjectDetector::recognizeDog(const cv::Mat &in_image, const ros::Time &in_t
     // robot z -> camera -y
     // They follow x-red, y-green and z-blue in both cases though
     
-    double dog_position_base_x = (camera_extrinsic_x_ +  dog_position_camera_z);
-    double dog_position_base_y = (camera_extrinsic_y_ + -dog_position_camera_x);
+    double obj_position_base_x = (camera_extrinsic_x_ +  obj_position_camera_z);
+    double obj_position_base_y = (camera_extrinsic_y_ + -obj_position_camera_x);
+
+    x = robot_x +  cos(robot_theta)*obj_position_base_x + sin(-robot_theta) * obj_position_base_y;
+    y = robot_y +  sin(robot_theta)*obj_position_base_x + cos(robot_theta) * obj_position_base_y;
+    z = 0.0     + camera_extrinsic_z_ + -obj_position_camera_y;
+}
+
+bool ObjectDetector::recognizeObject(const Colour colour, const std::string object_name, const cv::Mat &in_image,
+                                     const ros::Time &in_timestamp, const double& robot_x, const double& robot_y,
+                                     const double& robot_theta, cdt_msgs::Object &out_new_object)
+{
+    // The values below will be filled by the following functions
+    double obj_image_center_x;
+    double obj_image_center_y;
+    double obj_image_height;
+    double obj_image_width;
+    double x, y, z, depth;
+
+    cv::Mat in_image_red = applyColourFilter(in_image, colour);
+    cv::Mat in_image_bounding_box = applyBoundingBox(in_image_red, obj_image_center_x, obj_image_center_y, obj_image_width, obj_image_height);
+
+    // Note: Almost everything below should be kept as it is
+    if (obj_image_width < MIN_BBOX_WIDTH || obj_image_height < MIN_BBOX_HEIGHT) {
+        return false;
+    }
     
+    computePoseFromBBox(x, y, z, depth, obj_image_center_x, obj_image_center_y, obj_image_height, obj_image_width, robot_x, robot_y, robot_theta, object_name);
+
     // We need to be careful when computing the final position of the object in global (fixed frame) coordinates
     // We need to introduce a correction givne by the robot orientation
     // Fill message
-    out_new_object.id = "dog";
+    out_new_object.id = object_name;
     out_new_object.header.stamp = in_timestamp;
     out_new_object.header.frame_id = fixed_frame_;
-    out_new_object.position.x = robot_x +  cos(robot_theta)*dog_position_base_x + sin(-robot_theta) * dog_position_base_y;
-    out_new_object.position.y = robot_y +  sin(robot_theta)*dog_position_base_x + cos(robot_theta) * dog_position_base_y;
-    out_new_object.position.z = 0.0     + camera_extrinsic_z_ + -dog_position_camera_y;
+    out_new_object.position.x = x;
+    out_new_object.position.y = y;
+    out_new_object.position.z = z;
 
-    // return std::isfinite(depth);
-    return depth < 1;
+    if(object_name == "barrel") {
+        return depth < MIN_BARREL_DEPTH;
+    }
+    return depth < MIN_OBJECT_DEPTH;
 }
 
-// TODO: Implement similar methods for other objects
-// HERE
+bool ObjectDetector::recognizeDog(const cv::Mat &in_image, const ros::Time &in_timestamp, 
+                                  const double& robot_x, const double& robot_y, const double& robot_theta,
+                                  cdt_msgs::Object &out_new_object)
+{
+    return recognizeObject(Colour::RED, "dog", in_image, in_timestamp, robot_x, robot_y, robot_theta, out_new_object);
+}
 
+bool ObjectDetector::recognizeBarrow(const cv::Mat &in_image, const ros::Time &in_timestamp, 
+                                  const double& robot_x, const double& robot_y, const double& robot_theta,
+                                  cdt_msgs::Object &out_new_object)
+{
+    return recognizeObject(Colour::GREEN, "barrow", in_image, in_timestamp, robot_x, robot_y, robot_theta, out_new_object);
+}
 
+bool ObjectDetector::recognizeBarrel(const cv::Mat &in_image, const ros::Time &in_timestamp, 
+                                  const double& robot_x, const double& robot_y, const double& robot_theta,
+                                  cdt_msgs::Object &out_new_object)
+{
+    return recognizeObject(Colour::YELLOW, "barrel", in_image, in_timestamp, robot_x, robot_y, robot_theta, out_new_object);
+}
+
+bool ObjectDetector::recognizeComputer(const cv::Mat &in_image, const ros::Time &in_timestamp, 
+                                  const double& robot_x, const double& robot_y, const double& robot_theta,
+                                  cdt_msgs::Object &out_new_object)
+{
+    return recognizeObject(Colour::BLUE, "computer", in_image, in_timestamp, robot_x, robot_y, robot_theta, out_new_object);
+}
 
 // Utils
 void ObjectDetector::getRobotPose(double &x, double &y, double &theta)
