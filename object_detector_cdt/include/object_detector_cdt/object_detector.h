@@ -24,12 +24,13 @@
 #include <opencv2/highgui.hpp>
 #include <iostream>
 
-#define MIN_BBOX_WIDTH 50
-#define MIN_BBOX_HEIGHT 50
-#define MIN_OBJECT_DEPTH 1
+#define MIN_BBOX_WIDTH 75
+#define MIN_BBOX_HEIGHT 75
+#define MIN_OBJECT_DEPTH 1.5
+#define MIN_BARREL_DEPTH 3
 
 // Colours
-enum Colour { RED=0, YELLOW=0, GREEN=1,  BLUE=2 };
+enum Colour { RED=0, YELLOW=1, GREEN=2, BLUE=3 };
 
 class ObjectDetector
 {
@@ -87,11 +88,32 @@ private:
     // Detects the specified colour within the input image (BGR)
     cv::Mat applyBoundingBox(const cv::Mat1b &in_mask, double &x, double &y, double &width, double &height);
 
+    void computePoseFromBBox(double &x, double &y, double &z, double &depth,
+                             const double &image_center_x, const double &image_center_y,
+                             const double &image_height, const double &image_width,
+                             const double& robot_x, const double& robot_y,
+                             const double& robot_theta, std::string object_name);
+
+    bool recognizeObject(const Colour colour, const std::string object_name, const cv::Mat &in_image,
+                                         const ros::Time &in_timestamp, const double& robot_x, const double& robot_y,
+                                         const double& robot_theta, cdt_msgs::Object &out_new_object);
+
     // Implements the procedures to recognize objects
     bool recognizeDog(const cv::Mat &in_image, const ros::Time &in_timestamp, 
                       const double& robot_x, const double& robot_y, const double& robot_theta,
                       cdt_msgs::Object &out_new_object);
 
+    bool recognizeBarrow(const cv::Mat &in_image, const ros::Time &in_timestamp, 
+                         const double& robot_x, const double& robot_y, const double& robot_theta,
+                         cdt_msgs::Object &out_new_object);
+
+    bool recognizeBarrel(const cv::Mat &in_image, const ros::Time &in_timestamp, 
+                         const double& robot_x, const double& robot_y, const double& robot_theta,
+                         cdt_msgs::Object &out_new_object);
+
+    bool recognizeComputer(const cv::Mat &in_image, const ros::Time &in_timestamp, 
+                           const double& robot_x, const double& robot_y, const double& robot_theta,
+                           cdt_msgs::Object &out_new_object);
     
     // Utils
     void getRobotPose(double &x, double &y, double &theta);
