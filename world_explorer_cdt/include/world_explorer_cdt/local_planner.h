@@ -54,7 +54,7 @@ private:
     std::vector<geometry_msgs::Pose> visited_poses_;
     int num_visited_poses_;
     double FRONTIER_REPULSION_COEFF = 20.0;
-    double FRONTIER_ORIENTATION_PENALTY = 1.5;
+    double FRONTIER_ORIENTATION_PENALTY = 5.0;
 
     // Utils
     bool processPlannerOutput(const ompl::base::PlannerStatus& solved, 

@@ -59,12 +59,15 @@ void GraphPlanner::generateGraphFromMsg(Eigen::MatrixXd & graph)
 {
     // TODO fill the graph representation (adjacency matrix)
     for(int i=0; i<graph_size; i++){
-        for(int j=0; j<graph_.nodes.at(i).neighbors_id.size(); j++){
+        std::vector<std_msgs::Int32> neighbors = graph_.nodes.at(i).neighbors_id;
 
-            graph(i, graph_.nodes.at(i).neighbors_id.at(j).data) = 1;
-
+        for(int j=0; j<neighbors.size(); j++){
+            int node_id = graph_.nodes.at(i).id.data;
+            graph(node_id, neighbors.at(j).data) = distance(node_id, neighbors.at(j).data);
         }
     }
+
+    // std::cout << graph << std::endl;
 }
 
 bool GraphPlanner::planPath(const double& robot_x, 
@@ -138,9 +141,6 @@ void GraphPlanner::dijkstra(const Eigen::MatrixXd& graph, int start_id, int goal
             }		
 		}
 	}
-
-    std::cout << "--------------------------------------------------- Min dist..." << std::endl;
-
     // Add goal pose to route
     route.clear();
     Eigen::Vector2d goal(graph_.nodes.at(goal_id).pose.position.x, graph_.nodes.at(goal_id).pose.position.y);
@@ -150,6 +150,10 @@ void GraphPlanner::dijkstra(const Eigen::MatrixXd& graph, int start_id, int goal
     while(true) {
         // Access parent
         int parent_id = path[curr_id];
+
+        // std::cout << "curr_id: " << curr_id << std::endl;
+        // std::cout << "path[curr_id]: " << path[curr_id] << std::endl;
+        // std::cout << "parent_id: " << parent_id << std::endl;
 
         // Store pose of parent
         Eigen::Vector2d node(graph_.nodes.at(parent_id).pose.position.x,
@@ -164,7 +168,7 @@ void GraphPlanner::dijkstra(const Eigen::MatrixXd& graph, int start_id, int goal
         curr_id = parent_id;
     }
 
-    std::cout << "--------------------------------------------------- Backtracking..." << std::endl;
+    // std::cout << "--------------------------------------------------- Backtracking..." << std::endl;
 
     // Reverse the order of the route (we start from the goal)
     std::reverse(route.begin(), route.end());

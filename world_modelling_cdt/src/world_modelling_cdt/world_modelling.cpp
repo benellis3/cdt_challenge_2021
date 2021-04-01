@@ -149,7 +149,7 @@ bool WorldModelling::updateGraph(const float &x, const float &y, const float &th
     if(create_new_node)
     {
         // Adding neighbors
-        for (auto node: exploration_graph_.nodes) {
+        for (auto &node: exploration_graph_.nodes) {
            if (distance(new_node, node) < neighbor_distance_ && checkTraversability(node, new_node)) {
                 new_node.neighbors_id.push_back(node.id);
                 node.neighbors_id.push_back(new_node.id);
@@ -205,7 +205,8 @@ void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
             y_slope = traversability_.at("elevation", previous_y) - traversability_.at("elevation", next_y);
             max_slope = std::max(std::abs(x_slope), std::abs(y_slope));
 
-            if (elevation > elevation_threshold_ || max_slope > slope_threshold_) {
+            // if (elevation > elevation_threshold_ || max_slope > slope_threshold_) {
+            if (elevation > elevation_threshold_) {
                 traversability_.at("traversability", location) = -1.0;
             }
             else {

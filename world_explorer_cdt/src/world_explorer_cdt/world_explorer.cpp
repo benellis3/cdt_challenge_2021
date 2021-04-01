@@ -171,19 +171,29 @@ void WorldExplorer::plan()
         // Analyze and sort frontiers
         std::vector<Eigen::Vector2d> goals = local_planner_.searchFrontiers(frontiers_, robot_x, robot_y, robot_theta);
 
-        // std::vector<Eigen::Vector2d> goals;
-        // goals.push_back(frontiers_[0]);
+        int i = 0;
+        for(auto frontier: frontiers_.frontiers) {
+            std::cout << i << ": " << frontier.point.x << ", " << frontier.point.y << std::endl;
+            i++;
+        }
 
         bool found_path = false;
         for(auto goal: goals) {
             grid_map::Position goal_position(goal.x(), goal.y());
+            if(!traversability_.isInside(goal_position)){
+                continue;
+            } 
+
             if(traversability_.atPosition("traversability", goal_position) != 1.0) {
                 continue;
             }
             
+            
             Eigen::Vector2d goal_pose(goal.x(), goal.y());
             found_path = local_planner_.planPath(robot_x, robot_y, robot_theta, goal_pose, route_);
-            break;
+            if(found_path){
+                break;    
+            }
         }
 
         if(!found_path) {
