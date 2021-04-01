@@ -73,7 +73,7 @@ bool GraphPlanner::planPath(const double& robot_x,
                             Eigen::Vector2d goal_pose,
                             std::vector<Eigen::Vector2d>& route)
 {
-       
+    
     std::vector<geometry_msgs::Pose> graph_nodes;
 
     findClosestNodes(robot_x, robot_y, robot_theta, goal_pose, graph_nodes);    
@@ -86,7 +86,7 @@ bool GraphPlanner::planPath(const double& robot_x,
 
     int no_vertices = graph_.nodes.size();
 
-    Eigen::MatrixXd graph = Eigen::MatrixXd::Zero(no_vertices, no_vertices);
+    Eigen::MatrixXd graph = Eigen::MatrixXd::Constant(no_vertices, no_vertices, 1e6);
 
     generateGraphFromMsg(graph);
 
@@ -139,12 +139,35 @@ void GraphPlanner::dijkstra(const Eigen::MatrixXd& graph, int start_id, int goal
 		}
 	}
 
+    std::cout << "--------------------------------------------------- Min dist..." << std::endl;
+
     // Add goal pose to route
     route.clear();
     Eigen::Vector2d goal(graph_.nodes.at(goal_id).pose.position.x, graph_.nodes.at(goal_id).pose.position.y);
     route.push_back(goal);
 
-    // TODO extract the final route
+    int curr_id = goal_id;
+    while(true) {
+        // Access parent
+        int parent_id = path[curr_id];
+
+        // Store pose of parent
+        Eigen::Vector2d node(graph_.nodes.at(parent_id).pose.position.x,
+        graph_.nodes.at(parent_id).pose.position.y);
+        route.push_back(node);
+
+        // Check if we found the path
+        if(parent_id == start_id) {
+            break;
+        }
+
+        curr_id = parent_id;
+    }
+
+    std::cout << "--------------------------------------------------- Backtracking..." << std::endl;
+
+    // Reverse the order of the route (we start from the goal)
+    std::reverse(route.begin(), route.end());
 }
 
 int GraphPlanner::minimumDist(double dist[], bool Dset[]) 

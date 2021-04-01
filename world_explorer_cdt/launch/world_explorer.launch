@@ -11,8 +11,7 @@
   <arg name="planning_time"           default="1.5"/>
   <arg name="path_execute_limit"      default="50"/> <!-- [0-100] percent of path that is to be executed -->
   <arg name="output_frontiers_topic"  default="/frontiers"/>
-  <arg name="launch_prefix"           default=""/>
-  
+  <arg name="launch_prefix"           default="gdb -ex run --args"/>
 
   <!-- Launch object detector -->
   <node pkg="world_explorer_cdt" 

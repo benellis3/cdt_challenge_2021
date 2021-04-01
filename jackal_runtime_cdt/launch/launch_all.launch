@@ -45,7 +45,7 @@
   <include if="$(arg full)" file="$(find world_modelling_cdt)/launch/world_modelling.launch"/>
 
   <!-- World explorer -->
-  <include if="$(arg full)" file="$(find world_explorer_cdt)/launch/world_explorer.launch"/>
+  <!-- <include if="$(arg full)" file="$(find world_explorer_cdt)/launch/world_explorer.launch"/> -->
 
 
 </launch>

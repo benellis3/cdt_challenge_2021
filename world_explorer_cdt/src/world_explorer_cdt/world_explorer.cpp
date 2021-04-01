@@ -162,65 +162,100 @@ void WorldExplorer::plan()
     if(frontiers_.frontiers.size() > 0)
     {
         ROS_INFO("Exploooooriiiiiiiiiiiiiing");
-        ROS_DEBUG_STREAM("Pos controller status: " << pos_ctrl_status_);
+        ROS_INFO_STREAM("Pos controller status: " << pos_ctrl_status_);
         std::cout << "Frontiers size " << frontiers_.frontiers.size() << std::endl;
         // Get current position
         double robot_x, robot_y, robot_theta;
         getRobotPose2D(robot_x, robot_y, robot_theta);
-        
+
         // Analyze and sort frontiers
         std::vector<Eigen::Vector2d> goals = local_planner_.searchFrontiers(frontiers_, robot_x, robot_y, robot_theta);
 
-        // Choose best frontier
-        int goal_index = 0;
-        Eigen::Vector2d pose_goal = goals.at(goal_index);
+        // std::vector<Eigen::Vector2d> goals;
+        // goals.push_back(frontiers_[0]);
 
-        std::vector<Eigen::Vector2d> local_route;
-        double distance_to_goal;
-        
         bool found_path = false;
-
-        while(!found_path)
-        {
-            // if distance to best frontier is very large, use graph planner first 
-            distance_to_goal = std::hypot(robot_x - pose_goal.x(), robot_y - pose_goal.y());
-            if(distance_to_goal > max_local_planner_distance){
-                ROS_INFO("FRONTIER FAR AWAY. USING GRAPH PLANNER");
-                graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
-
-                // add local route from last graph planner node to actual goal
-                found_path = local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
-                if(found_path){
-                    route_.insert(route_.end(), local_route.begin(), local_route.end());
-                    break;
-                }
+        for(auto goal: goals) {
+            grid_map::Position goal_position(goal.x(), goal.y());
+            if(traversability_.atPosition("traversability", goal_position) != 1.0) {
+                continue;
+            }
             
-            }
-            // try using local planner only
-            found_path = local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
-            if(!found_path){
-                // try using graph planner and then local planner
-                ROS_INFO("LOCAL PLANNER DID NOT FIND PATH, TRY USING GRAPH PLANNER");
-                graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
-
-                // add local route from last graph planner node to actual goal
-                found_path = local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
-
-                route_.insert(route_.end(), local_route.begin(), local_route.end());
-            }
-            if(!found_path){
-                // if still haven't found a path, try next frontier
-                goal_index++;
-                if(goal_index == goals.size())
-                {
-                    ROS_ERROR("Could not find path to any frontier.");
-                    break;
-                }
-                pose_goal = goals.at(goal_index);
-            }
+            Eigen::Vector2d goal_pose(goal.x(), goal.y());
+            found_path = local_planner_.planPath(robot_x, robot_y, robot_theta, goal_pose, route_);
+            break;
         }
+
+        if(!found_path) {
+            // for(auto goal: goals) {
+                
+            // }
+            grid_map::Position goal_position(goals[0].x(), goals[0].y());
+            Eigen::Vector2d goal_pose(goals[0].x(), goals[0].y());
+            graph_planner_.planPath(robot_x, robot_y, robot_theta, goal_pose, route_);
+        }
+
+        // Choose best frontier
+        // int goal_index = 0;
+        // Eigen::Vector2d pose_goal = goals.at(goal_index);
+
+        // std::cout << "Current state: " << robot_x << ", " << robot_y << std::endl;
+        // std::cout << "Pose goal: " << pose_goal.transpose() << std::endl;
+
+        // std::vector<Eigen::Vector2d> local_route;
+        // double distance_to_goal;
         
+        // bool found_path = false;
+
+        // while(!found_path)
+        // {
+        //     // if distance to best frontier is very large, use graph planner first 
+        //     // distance_to_goal = std::hypot(robot_x - pose_goal.x(), robot_y - pose_goal.y());
+        //     // if(distance_to_goal > max_local_planner_distance){
+        //     //     ROS_INFO("FRONTIER FAR AWAY. USING GRAPH PLANNER");
+        //     //     graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+
+        //     //     // add local route from last graph planner node to actual goal
+        //     //     found_path = local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
+        //     //     if(found_path){
+        //     //         route_.insert(route_.end(), local_route.begin(), local_route.end());
+        //     //         break;
+        //     //     }
+            
+        //     // }
+
+        //     // try using local planner only
+        //     found_path = local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+        //     if(!found_path){
+        //         // try using graph planner and then local planner
+        //         ROS_INFO("LOCAL PLANNER DID NOT FIND PATH, TRY USING GRAPH PLANNER");
+        //         graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+
+        //         // add local route from last graph planner node to actual goal
+        //         found_path = local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
+
+        //         route_.insert(route_.end(), local_route.begin(), local_route.end());
+        //     }
+        //     if(!found_path){
+        //         // if still haven't found a path, try next frontier
+        //         goal_index++;
+        //         if(goal_index == goals.size())
+        //         {
+        //             ROS_ERROR("Could not find path to any frontier.");
+        //             break;
+        //         }
+        //         pose_goal = goals.at(goal_index);
+        //     }
+        // }
+
+        // for (auto it: route_)
+        // {
+        //     std::cout << "Route position: " << it.x() << ", " << it.y() << std::endl;
+        // }
         
+        // Eigen::Vector2d end_route = route_.end();
+        // std::cout << "--------------------------- Pose goal: " << pose_goal[0] << ", " << pose_goal[1] << std::endl;
+        // std::cout << "--------------------------- Route end: " << end_route[0] << ", " << end_route[1] << std::endl;
 
         // If we have route targets (frontiers), work them off and send to position controller
         if(route_.size() > 0)
