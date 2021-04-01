@@ -65,6 +65,7 @@ class WorldModelling
     unsigned int num_nodes_;
     bool first_node_;
     bool first_frontier_;
+    float resolution_;
 
     float slope_threshold_;
 
@@ -101,4 +102,8 @@ private:
     bool checkDistanceToGraph(const float &x, const float &y, const double &threshold);
     
     bool checkDistanceToGraph(cdt_msgs::GraphNode &in_node, const double &threshold);
+    
+    bool checkTraversability(grid_map::Position &start, grid_map::Position &end);
+    
+    bool checkTraversability(cdt_msgs::GraphNode &start, cdt_msgs::GraphNode &end);
 };

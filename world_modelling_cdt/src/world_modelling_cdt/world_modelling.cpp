@@ -52,6 +52,7 @@ void WorldModelling::readParameters(ros::NodeHandle &nh)
     nh.param("max_distance_to_search_frontiers", max_distance_to_search_frontiers_, 3.f);
     nh.param("distance_to_delete_frontier", distance_to_delete_frontier_, 2.5f);
     nh.param("frontiers_search_angle_resolution", frontiers_search_angle_resolution_, 0.5f);
+    nh.param("line_search_resolution", resolution_, 0.2f);
 
     slope_threshold_ = 0.1;
 }
@@ -98,6 +99,22 @@ float distance(cdt_msgs::GraphNode &node, cdt_msgs::GraphNode &other_node) {
 }
 
 
+bool WorldModelling::checkTraversability(cdt_msgs::GraphNode &start, cdt_msgs::GraphNode &end) {
+    grid_map::Position start_pos(start.pose.position.x, start.pose.position.y);
+    grid_map::Position end_pos(end.pose.position.x, end.pose.position.y);
+    return checkTraversability(start_pos, end_pos);
+
+}
+
+bool WorldModelling::checkTraversability(grid_map::Position &start, grid_map::Position &end) {
+    for(double alpha = 0.0; alpha < 1.0; alpha += resolution_) {
+        auto position = alpha * start + (1 - alpha) * end;
+        if (traversability_.atPosition("traversability", position) == -1.0) {
+            return false;
+        }
+    }
+    return true;
+}
 
 bool WorldModelling::updateGraph(const float &x, const float &y, const float &theta)
 {
@@ -133,7 +150,7 @@ bool WorldModelling::updateGraph(const float &x, const float &y, const float &th
     {
         // Adding neighbors
         for (auto node: exploration_graph_.nodes) {
-           if (distance(new_node, node) < neighbor_distance_) {
+           if (distance(new_node, node) < neighbor_distance_ && checkTraversability(node, new_node)) {
                 new_node.neighbors_id.push_back(node.id);
                 node.neighbors_id.push_back(new_node.id);
            }
