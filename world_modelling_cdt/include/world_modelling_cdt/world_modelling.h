@@ -45,7 +45,6 @@ class WorldModelling
     float elevation_threshold_;
     float max_distance_to_search_frontiers_;
     float distance_to_delete_frontier_;
-    float max_distance_to_delete_frontier_;
     float frontiers_search_angle_resolution_;
 
     // output topics
@@ -98,4 +97,8 @@ private:
 
     // Utils
     void getRobotPose(float &x, float &y, float &theta);
+
+    bool checkDistanceToGraph(const float &x, const float &y, const double &threshold);
+    
+    bool checkDistanceToGraph(cdt_msgs::GraphNode &in_node, const double &threshold);
 };
