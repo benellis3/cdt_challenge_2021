@@ -61,6 +61,7 @@ private:
                                 std::vector<Eigen::Vector2d>& route);
     bool isStateValid(const ompl::base::State *state);
     bool isPoseValid(const Eigen::Isometry3d& pose);
+    double wrapAngle(double x);
 
 public:
     // Constructor
