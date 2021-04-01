@@ -8,7 +8,7 @@
   <arg name="input_goal_orientation_threshold"  default="1.0"/>
   <arg name="output_twist_topic"                default="/cmd_vel"/>
   <arg name="control_rate"                      default="100.0"/>
-  <arg name="linear_gain"                       default="1"/>
+  <arg name="linear_gain"                       default="0.2"/>
   <arg name="heading_gain"                      default="4.0"/>
   <arg name="orientation_gain"                  default="0.0"/>
 

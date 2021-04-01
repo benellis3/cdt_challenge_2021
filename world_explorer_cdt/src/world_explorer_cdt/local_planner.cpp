@@ -65,6 +65,12 @@ std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers f
                 f.closest_visited_point_dist_ = current_dist;
             }
         }
+
+        double dist = std::hypot(robot_x - f.x_, robot_y - f.y_);
+        if(dist > dist_max) {
+            dist_max = dist;
+        }
+
         //std::cout << "Frontier (x, y): " << f.x_ << ", " << f.y_ << std::endl;
         //std::cout << "Robot position (x, y): " << robot_x << ", " << robot_y << std::endl;
         // Store in frontier_headings
@@ -77,13 +83,14 @@ std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers f
         // create a cost, lower cost is better                                 
  
         // start out just using the closest frontier
-        frontier.cost_ = std::hypot(robot_x - frontier.x_, robot_y - frontier.y_);
-        std::cout << "Distance cost " << frontier.cost_ << std::endl;
+        frontier.cost_ = std::hypot(robot_x - frontier.x_, robot_y - frontier.y_) / dist_max;
+        // std::cout << "Distance cost " << frontier.cost_ << std::endl;
         // penalise frontiers close to previously visited poses
-        frontier.cost_ += FRONTIER_REPULSION_COEFF / (frontier.closest_visited_point_dist_ + 1e-3);
-        std::cout << "Distance and Avoidance cost " << frontier.cost_ << std::endl;
+        // frontier.cost_ += FRONTIER_REPULSION_COEFF / (frontier.closest_visited_point_dist_ + 1e-3);
+        // std::cout << "Distance and Avoidance cost " << frontier.cost_ << std::endl;
         // penalise frontiers that require a lot of turning
-        frontier.cost_ += FRONTIER_ORIENTATION_PENALTY * abs(wrapAngle(std::atan2(frontier.y_ - robot_y, frontier.x_ - robot_x) - robot_theta));
+        // frontier.cost_ += FRONTIER_ORIENTATION_PENALTY * abs(wrapAngle(std::atan2(frontier.y_ - robot_y, frontier.x_ - robot_x) - robot_theta));
+        frontier.cost_ += FRONTIER_ORIENTATION_PENALTY * (1 - std::cos(std::atan2(frontier.y_ - robot_y, frontier.x_ - robot_x) - robot_theta));
         std::cout << "robot theta: " << robot_theta << " angle to frontier: " << wrapAngle(std::atan2(frontier.y_ - robot_y, frontier.x_ - robot_x)) << " Orientation cost term: " <<  abs(atan2(frontier.y_ - robot_y, frontier.x_ - robot_x) - robot_theta) << std::endl;
         std::cout <<"total cost " << frontier.cost_ << std::endl;
 

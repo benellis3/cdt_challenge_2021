@@ -160,8 +160,8 @@ cv::Mat ObjectDetector::applyColourFilter(const cv::Mat &in_image_bgr, const Col
     cv::erode(mask, eroded_mask, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(7, 7)));
     cv::dilate(eroded_mask, dilated_mask, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(7, 7)));
 
-    cv::imwrite("/home/cdt2021/input_img_hsv.png", in_image_hsv);
-    cv::imwrite("/home/cdt2021/mask.png", dilated_mask);
+    // cv::imwrite("/home/cdt2021/input_img_hsv.png", in_image_hsv);
+    // cv::imwrite("/home/cdt2021/mask.png", dilated_mask);
 
     // We return the mask, that will be used later
     return dilated_mask;
@@ -218,10 +218,10 @@ cv::Mat ObjectDetector::applyBoundingBox(const cv::Mat1b &in_mask, double &x, do
     }
 
     // debugging bbox
-    cv::Point top_left(top_left_x, top_left_y);
-    cv::Point bottom_right(bottom_right_x, bottom_right_y); 
-    cv::rectangle(in_mask, top_left, bottom_right, cv::Scalar(255, 255, 255));
-    cv::imwrite("/home/cdt2021/bbox.png", in_mask);
+    // cv::Point top_left(top_left_x, top_left_y);
+    // cv::Point bottom_right(bottom_right_x, bottom_right_y); 
+    // cv::rectangle(in_mask, top_left, bottom_right, cv::Scalar(255, 255, 255));
+    // cv::imwrite("/home/cdt2021/bbox.png", in_mask);
 
     return drawing;
 }
