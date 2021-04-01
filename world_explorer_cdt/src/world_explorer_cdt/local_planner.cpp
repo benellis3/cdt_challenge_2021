@@ -1,4 +1,6 @@
 #include <world_explorer_cdt/local_planner.h>
+#include <math.h>
+#include <cmath>
 
 LocalPlanner::LocalPlanner()
 {
@@ -29,6 +31,11 @@ void LocalPlanner::setMap(const grid_map::GridMap& map)
         ROS_ERROR("trav layer does not exist in map");   
 }
 
+void LocalPlanner::setVisitedPositions(const std::vector<geometry_msgs::Pose>& nodes){
+    visited_poses_ = nodes;
+    num_visited_poses_ = nodes.size();
+}
+
 std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers frontiers, 
                                                           const double& robot_x, const double&  robot_y, const double&  robot_theta)
 {
@@ -38,7 +45,7 @@ std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers f
 
     std::vector<FrontierCost> frontier_costs; // frontier, heading
 
-    // TODO compute the cost terms, might think of other contributions than just x,y location...
+    // TODO compute the things that might influence costs, might think of other contributions than just x,y location...
     for(auto frontier : frontiers.frontiers)
     {
         // Create new frontier struct
@@ -48,15 +55,38 @@ std::vector<Eigen::Vector2d> LocalPlanner::searchFrontiers(cdt_msgs::Frontiers f
         f.x_ = frontier.point.x;
         f.y_ = frontier.point.y;
 
+        // calculate distance to closest point already visited
+        f.closest_visited_point_dist_ = 1e5;
+        double current_dist;
+        for(auto& pose : visited_poses_)
+        {
+            current_dist = std::hypot(f.x_ - pose.position.x, f.y_ - pose.position.y);
+            if(current_dist < f.closest_visited_point_dist_){
+                f.closest_visited_point_dist_ = current_dist;
+            }
+        }
+        //std::cout << "Frontier (x, y): " << f.x_ << ", " << f.y_ << std::endl;
+        //std::cout << "Robot position (x, y): " << robot_x << ", " << robot_y << std::endl;
         // Store in frontier_headings
         frontier_costs.push_back(f);
     }
 
-    // TODO Compute cost combining information generated above, free to come up with other cost function terms
+    // Compute cost combining information generated above, free to come up with other cost function terms
+
     for(auto& frontier : frontier_costs){
-        // We need to create a cost, lower cost is better                                 
+        // create a cost, lower cost is better                                 
  
-        frontier.cost_ = 1;
+        // start out just using the closest frontier
+        frontier.cost_ = std::hypot(robot_x - frontier.x_, robot_y - frontier.y_);
+        std::cout << "Distance cost " << frontier.cost_ << std::endl;
+        // penalise frontiers close to previously visited poses
+        frontier.cost_ += FRONTIER_REPULSION_COEFF / (frontier.closest_visited_point_dist_ + 1e-3);
+        std::cout << "Distance and Avoidance cost " << frontier.cost_ << std::endl;
+        // penalise frontiers that require a lot of turning
+        frontier.cost_ += FRONTIER_ORIENTATION_PENALTY * abs(wrapAngle(std::atan2(frontier.y_ - robot_y, frontier.x_ - robot_x) - robot_theta));
+        std::cout << "robot theta: " << robot_theta << " angle to frontier: " << wrapAngle(std::atan2(frontier.y_ - robot_y, frontier.x_ - robot_x)) << " Orientation cost term: " <<  abs(atan2(frontier.y_ - robot_y, frontier.x_ - robot_x) - robot_theta) << std::endl;
+        std::cout <<"total cost " << frontier.cost_ << std::endl;
+
     }
 
     // We want to sort the frontiers using the costs previously computed
@@ -210,13 +240,34 @@ bool LocalPlanner::isPoseValid(const Eigen::Isometry3d& pose)
         corner_points.push_back( pt.head<2>() );
     }
 
+    Eigen::Vector2d current_point;
+    float traversable;
     // check the validity of the edge points themselfs
     for (int j = 0; j < corner_points.size(); ++j)
     {
-        // TODO check that the corner points are valid (to make sure the robot itself is in a valid pose)
+        // check that the corner points of the robot are valid (to make sure the robot itself is in a valid pose)
         // return false if not valid...
-        continue;
+        current_point = corner_points[j];
+
+        if(traversability_.isInside(current_point) == 0){
+            return false;
+        }
+
+        traversable = traversability_.atPosition("traversability", current_point);
+
+        if(traversable < 0.0){
+            return false;
+        }
     }
 
     return true;
+}
+
+double LocalPlanner::wrapAngle(double x)
+{
+    // This method returns an angle between [-pi, pi]
+    x = fmod(x + M_PI, 2.0 * M_PI);
+    if (x < 0)
+        x += 2.0 * M_PI;
+    return x - M_PI;
 }

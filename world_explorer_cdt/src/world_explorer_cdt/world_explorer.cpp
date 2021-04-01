@@ -119,6 +119,17 @@ void WorldExplorer::graphCallback(const cdt_msgs::Graph& in_graph)
 {
     // Set the graph structure to graph planner
     graph_planner_.setGraph(in_graph);
+
+    // save visited poses in local planner
+    std::vector<geometry_msgs::Pose> visited_nodes;
+    for(auto node : in_graph.nodes){
+        visited_nodes.push_back(node.pose);
+    }
+    local_planner_.setVisitedPositions(visited_nodes);
+
+    // save starting pose
+    starting_pose_ = in_graph.nodes.at(0).pose;
+
 }
 
 void WorldExplorer::positionCtrlCallback(const std_msgs::Float32& in_status)
@@ -152,7 +163,7 @@ void WorldExplorer::plan()
     {
         ROS_INFO("Exploooooriiiiiiiiiiiiiing");
         ROS_DEBUG_STREAM("Pos controller status: " << pos_ctrl_status_);
-
+        std::cout << "Frontiers size " << frontiers_.frontiers.size() << std::endl;
         // Get current position
         double robot_x, robot_y, robot_theta;
         getRobotPose2D(robot_x, robot_y, robot_theta);
@@ -160,18 +171,56 @@ void WorldExplorer::plan()
         // Analyze and sort frontiers
         std::vector<Eigen::Vector2d> goals = local_planner_.searchFrontiers(frontiers_, robot_x, robot_y, robot_theta);
 
-        // TODO Choose a frontier, work it off if it is valid and send it to the position controller
-        // here we just use the first one as an example
-        Eigen::Vector2d pose_goal = goals.at(0);
+        // Choose best frontier
+        int goal_index = 0;
+        Eigen::Vector2d pose_goal = goals.at(goal_index);
 
-        // Local Planner (RRT)
-        // TODO Plan a route to the most suitable frontier
-        local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+        std::vector<Eigen::Vector2d> local_route;
+        double distance_to_goal;
+        
+        bool found_path = false;
 
-        // some more reasoning to be done here....
+        while(!found_path)
+        {
+            // if distance to best frontier is very large, use graph planner first 
+            distance_to_goal = std::hypot(robot_x - pose_goal.x(), robot_y - pose_goal.y());
+            if(distance_to_goal > max_local_planner_distance){
+                ROS_INFO("FRONTIER FAR AWAY. USING GRAPH PLANNER");
+                graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
 
-        // TODO Graph Planner
-        graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+                // add local route from last graph planner node to actual goal
+                found_path = local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
+                if(found_path){
+                    route_.insert(route_.end(), local_route.begin(), local_route.end());
+                    break;
+                }
+            
+            }
+            // try using local planner only
+            found_path = local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+            if(!found_path){
+                // try using graph planner and then local planner
+                ROS_INFO("LOCAL PLANNER DID NOT FIND PATH, TRY USING GRAPH PLANNER");
+                graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+
+                // add local route from last graph planner node to actual goal
+                found_path = local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
+
+                route_.insert(route_.end(), local_route.begin(), local_route.end());
+            }
+            if(!found_path){
+                // if still haven't found a path, try next frontier
+                goal_index++;
+                if(goal_index == goals.size())
+                {
+                    ROS_ERROR("Could not find path to any frontier.");
+                    break;
+                }
+                pose_goal = goals.at(goal_index);
+            }
+        }
+        
+        
 
         // If we have route targets (frontiers), work them off and send to position controller
         if(route_.size() > 0)
@@ -207,8 +256,50 @@ void WorldExplorer::plan()
     }
     else
     {
-        ROS_INFO("No frontiers to go to.");
-        // TODO: Implement something to indicate it ended and optionally go to the home position
+        // Implement something to indicate it ended and optionally go to the home position
+        ROS_INFO("No frontiers to go to. Returning to starting position.");
+        Eigen::Vector2d pose_goal; 
+        pose_goal.x() = starting_pose_.position.x;
+        pose_goal.y() = starting_pose_.position.y;
+
+        // Get current position
+        double robot_x, robot_y, robot_theta;
+        getRobotPose2D(robot_x, robot_y, robot_theta);
+        
+        graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+
+        // If we have route targets (frontiers), work them off and send to position controller
+        if(route_.size() > 0)
+        {
+            // Create goal message
+            geometry_msgs::PoseStamped target;
+            target.pose.position.x = route_.begin()->x();
+            target.pose.position.y = route_.begin()->y();
+            target.pose.position.z = 0.25;
+            target.header.frame_id = goal_frame_;
+            goal_pub_.publish(target);
+            ROS_DEBUG_STREAM("Sending target " << route_.begin()->transpose());
+
+            // Visualize route (plan)
+            nav_msgs::Path plan;
+            plan.header.stamp = ros::Time::now(); // Should fix this
+            plan.header.frame_id = goal_frame_;
+            geometry_msgs::PoseStamped pose;
+            pose.pose.position.x = robot_x;
+            pose.pose.position.y = robot_y;
+            pose.pose.position.z = 0.25; // This is to improve the visualization only
+            plan.poses.push_back(pose);
+
+            for(auto carrot : route_){
+                geometry_msgs::PoseStamped pose;
+                pose.pose.position.x = carrot.x();
+                pose.pose.position.y = carrot.y();
+                pose.pose.position.z = 0.25; // This is to improve the visualization only
+                plan.poses.push_back(pose);
+            }
+            plan_pub_.publish(plan);
+        } 
+        
     }
 }
 

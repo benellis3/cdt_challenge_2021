@@ -51,7 +51,6 @@ void WorldModelling::readParameters(ros::NodeHandle &nh)
 
     nh.param("max_distance_to_search_frontiers", max_distance_to_search_frontiers_, 3.f);
     nh.param("distance_to_delete_frontier", distance_to_delete_frontier_, 2.5f);
-    nh.param("max_distance_to_delete_frontier", max_distance_to_delete_frontier_, 2.5f);
     nh.param("frontiers_search_angle_resolution", frontiers_search_angle_resolution_, 0.5f);
 
     slope_threshold_ = 0.1;
@@ -97,6 +96,8 @@ void WorldModelling::elevationMapCallback(const grid_map_msgs::GridMap &in_grid_
 float distance(cdt_msgs::GraphNode &node, cdt_msgs::GraphNode &other_node) {
     return std::hypot(node.pose.position.x - other_node.pose.position.x, node.pose.position.y - other_node.pose.position.y); 
 }
+
+
 
 bool WorldModelling::updateGraph(const float &x, const float &y, const float &theta)
 {
@@ -157,6 +158,8 @@ void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
 
     // Copy elevation from input grid map to traversability grid map
     traversability_.add("elevation", grid_map["elevation_inpainted"]);
+    // Copy slope from input grid map to traversability grid map
+    traversability_.add("slope", grid_map["slope_inpainted"]);
 
     // Create a new traversability layer with initial value 0.0
     traversability_.add("traversability", 0.0);
@@ -200,6 +203,26 @@ void WorldModelling::computeTraversability(const grid_map::GridMap &grid_map)
     traversability_.setBasicLayers({"traversability", "elevation"});
 }
 
+
+bool WorldModelling::checkDistanceToGraph(const float &x, const float &y, const double &threshold) {
+    cdt_msgs::GraphNode in_node;
+    in_node.pose.position.x = x;
+    in_node.pose.position.y = y;
+    return checkDistanceToGraph(in_node, threshold);
+}
+
+
+bool WorldModelling::checkDistanceToGraph(cdt_msgs::GraphNode &in_node, const double &threshold) {
+
+    for (auto node : exploration_graph_.nodes) {
+        if (distance(in_node, node) < threshold) {
+            return false;
+        }
+    }
+    return true;
+}
+
+
 void WorldModelling::findCurrentFrontiers(const float &x, const float &y, const float &theta, const ros::Time &time)
 {
     /**
@@ -212,6 +235,7 @@ void WorldModelling::findCurrentFrontiers(const float &x, const float &y, const 
     for (double angle = -M_PI; angle < M_PI; angle += frontiers_search_angle_resolution_) {
         double frontier_x = x + max_distance_to_search_frontiers_ * std::cos(angle);
         double frontier_y = y + max_distance_to_search_frontiers_ * std::sin(angle);
+
         geometry_msgs::PointStamped frontier;
         frontier.header.stamp = time;                  // We store the time the frontier was created
         frontier.header.frame_id = input_fixed_frame_; // And the frame it's referenced to
@@ -222,12 +246,13 @@ void WorldModelling::findCurrentFrontiers(const float &x, const float &y, const 
         bool is_traversable = traversability_.atPosition("traversability", position) == 1.0;
         ROS_DEBUG_STREAM("IsInside: " << is_inside);
         ROS_DEBUG_STREAM("IsTraversible: " << is_traversable);
-        if (is_inside && is_traversable)
+        if (is_inside && is_traversable && checkDistanceToGraph(frontier_x, frontier_y, distance_to_delete_frontier_))
             current_frontiers_.frontiers.push_back(frontier);
     }
 
     ROS_DEBUG_STREAM("[WorldModelling] Found " << current_frontiers_.frontiers.size() << " new frontiers");
 }
+
 
 void WorldModelling::updateFrontiers(const float &x, const float &y, const float &theta)
 {
@@ -247,29 +272,34 @@ void WorldModelling::updateFrontiers(const float &x, const float &y, const float
 
     // Preallocate query point
     grid_map::Position query_point;
+   
+    // add the current frontiers 
+    for (auto frontier : current_frontiers_.frontiers) {
+        filtered_frontiers.frontiers.push_back(frontier);
+    }
 
-    // Iterate
+    // Iterate over the old frontiers and add them if they
+    // are still valid
     for (auto frontier : frontiers_.frontiers)
     {
         const float &frontier_x = frontier.point.x;
         const float &frontier_y = frontier.point.y;
-
-        // Compute distance to frontier
-        float distance_to_frontier = std::hypot(frontier_x - x, frontier_y - y);
-
+        // Compute minimum distance from frontier to the graph
+        bool frontier_far_enough = checkDistanceToGraph(frontier_x, frontier_y, distance_to_delete_frontier_); 
         // If it's close enough, skip
         // also delete frontiers if they are too far away
-        if (distance_to_frontier < distance_to_delete_frontier_ || distance_to_frontier > max_distance_to_delete_frontier_)
+        grid_map::Position position(frontier.point.x, frontier.point.y);
+        if (!frontier_far_enough) 
         {
             continue;
         }
 
         // If the previous test are passed, add frontier to filtered list
-        current_frontiers_.frontiers.push_back(frontier);
+        filtered_frontiers.frontiers.push_back(frontier);
     }
 
     // Finally, we update the frontiers using the current ones
-    frontiers_ = current_frontiers_;
+    frontiers_ = filtered_frontiers;
 }
 
 void WorldModelling::publishData(const grid_map_msgs::GridMapInfo &in_grid_map_info)
