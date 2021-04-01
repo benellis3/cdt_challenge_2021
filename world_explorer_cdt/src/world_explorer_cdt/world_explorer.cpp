@@ -176,61 +176,49 @@ void WorldExplorer::plan()
         Eigen::Vector2d pose_goal = goals.at(goal_index);
 
         std::vector<Eigen::Vector2d> local_route;
+        double distance_to_goal;
+        
+        bool found_path = false;
 
-        // if distance to best frontier is very large, use graph planner first 
-        double distance_to_goal = std::hypot(robot_x - pose_goal.x(), robot_y - pose_goal.y());
-        if(distance_to_goal > max_local_planner_distance){
-            ROS_INFO("FRONTIER FAR AWAY. USING GRAPH PLANNER");
-            graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
-
-            // add local route from last graph planner node to actual goal
-            local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
-
-            route_.insert(route_.end(), local_route.begin(), local_route.end());
-        }
-        else{
-            bool found_path = false;
-
-            while(!found_path)
-            {
-                // try using local planner only
-                found_path = local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
-                if(!found_path){
-                    // try using graph planner and then local planner
-                    ROS_INFO("LOCAL PLANNER DID NOT FIND PATH, TRY USING GRAPH PLANNER");
-                    graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
-
-                    // add local route from last graph planner node to actual goal
-                    found_path = local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
-
-                    route_.insert(route_.end(), local_route.begin(), local_route.end());
-                }
-                if(!found_path){
-                    // if still haven't found a path, try next frontier
-                    goal_index++;
-                    if(goal_index == goals.size())
-                    {
-                        ROS_ERROR("Could not find path to any frontier.");
-                        break;
-                    }
-                    pose_goal = goals.at(goal_index);
-                }
-            }
-
-            if(!found_path)
-            {
-                ROS_INFO("USING GRAPH PLANNER");
+        while(!found_path)
+        {
+            // if distance to best frontier is very large, use graph planner first 
+            distance_to_goal = std::hypot(robot_x - pose_goal.x(), robot_y - pose_goal.y());
+            if(distance_to_goal > max_local_planner_distance){
+                ROS_INFO("FRONTIER FAR AWAY. USING GRAPH PLANNER");
                 graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
 
                 // add local route from last graph planner node to actual goal
-                std::vector<Eigen::Vector2d> local_route;
-                local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
+                found_path = local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
+                if(found_path){
+                    route_.insert(route_.end(), local_route.begin(), local_route.end());
+                    break;
+                }
+            
+            }
+            // try using local planner only
+            found_path = local_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+            if(!found_path){
+                // try using graph planner and then local planner
+                ROS_INFO("LOCAL PLANNER DID NOT FIND PATH, TRY USING GRAPH PLANNER");
+                graph_planner_.planPath(robot_x, robot_y, robot_theta, pose_goal, route_);
+
+                // add local route from last graph planner node to actual goal
+                found_path = local_planner_.planPath(route_.back().x(), route_.back().y(), robot_theta, pose_goal, local_route);
 
                 route_.insert(route_.end(), local_route.begin(), local_route.end());
             }
+            if(!found_path){
+                // if still haven't found a path, try next frontier
+                goal_index++;
+                if(goal_index == goals.size())
+                {
+                    ROS_ERROR("Could not find path to any frontier.");
+                    break;
+                }
+                pose_goal = goals.at(goal_index);
+            }
         }
-        // Local Planner (RRT)
-        // Plan a route to the best frontier to which a path exists
         
         
 
