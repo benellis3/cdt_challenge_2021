@@ -71,7 +71,7 @@ void ObjectDetector::imageCallback(const sensor_msgs::ImageConstPtr &in_msg)
     // Convert message to OpenCV image
     convertMessageToImage(in_msg, image, timestamp);
 
-    // Recognize object
+    // Recognize objects
     if(!wasObjectDetected("dog"))
     {
         cdt_msgs::Object new_object;
@@ -157,8 +157,8 @@ cv::Mat ObjectDetector::applyColourFilter(const cv::Mat &in_image_bgr, const Col
     }
 
     cv::Mat eroded_mask, dilated_mask;
-    cv::erode(mask, eroded_mask, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
-    cv::dilate(eroded_mask, dilated_mask, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3)));
+    cv::erode(mask, eroded_mask, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(7, 7)));
+    cv::dilate(eroded_mask, dilated_mask, cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(7, 7)));
 
     cv::imwrite("/home/cdt2021/input_img_hsv.png", in_image_hsv);
     cv::imwrite("/home/cdt2021/mask.png", dilated_mask);
@@ -178,6 +178,8 @@ cv::Mat ObjectDetector::applyBoundingBox(const cv::Mat1b &in_mask, double &x, do
     bottom_right_x = 0;
     bottom_right_y = 0;
 
+    int activated_pixels;
+    activated_pixels = 0;
     for (int i = 0; i < in_mask.rows; ++i)
     {
         for (int j = 0; j < in_mask.cols; ++j)
@@ -198,6 +200,8 @@ cv::Mat ObjectDetector::applyBoundingBox(const cv::Mat1b &in_mask, double &x, do
                 if (i > bottom_right_y) {
                     bottom_right_y = i;
                 }
+
+                activated_pixels++;
             }
         }
     }
@@ -206,6 +210,12 @@ cv::Mat ObjectDetector::applyBoundingBox(const cv::Mat1b &in_mask, double &x, do
     y = (top_left_y + bottom_right_y) / 2;
     width = bottom_right_x - top_left_x;
     height = bottom_right_y - top_left_y;
+
+    // how filled is the mask? should be at least 30% for it to be a valid detection
+    if (activated_pixels < std::ceil(0.25*width*height)) {
+        width = -1;
+        height = -1;
+    }
 
     // debugging bbox
     cv::Point top_left(top_left_x, top_left_y);
